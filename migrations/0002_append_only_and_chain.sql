@@ -194,7 +194,14 @@ BEGIN
 END;
 $$;
 
--- Triggers fire in name order: gate first, then chain, so a rejected entry
+-- BEFORE INSERT triggers fire in name order. With migrations 0001–0003 alone
+-- the order is gate (10) then chain (20): the gate's EXISTS checks run before
+-- the chain takes the advisory lock — the READ COMMITTED race fixed by
+-- migration 0004. After 0004 the full order is:
+--   00_serialize  → take the append lock first
+--   10_gate       → uniqueness / four-eyes / human-only checks
+--   20_chain      → prev_hash / entry_hash (re-entrant on the same lock)
+-- A rejected gate still aborts before the chain writes, so a refused entry
 -- never consumes a chain position.
 CREATE TRIGGER holdfast_ledger_10_gate
   BEFORE INSERT ON holdfast_ledger
