@@ -1,0 +1,41 @@
+{
+  "name": "holdfast",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An append-only decision ledger with a human approval gate: AI can propose, only a person can publish.",
+  "license": "MIT",
+  "author": "Dallas Crilley <dallas@dallascrilley.com>",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "holdfast": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down -v",
+    "migrate": "tsx src/cli.ts migrate",
+    "verify": "tsx src/cli.ts verify",
+    "demo": "tsx src/cli.ts demo",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "pg": "8.13.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "@types/pg": "8.11.10",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2",
+    "vitest": "2.1.8"
+  }
+}

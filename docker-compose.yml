@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: holdfast-postgres
+    environment:
+      POSTGRES_USER: holdfast_admin
+      POSTGRES_PASSWORD: holdfast_admin_local
+      POSTGRES_DB: holdfast
+    ports:
+      # Deliberately not 5432 — this is a throwaway database and should never
+      # collide with a Postgres you actually care about.
+      - '55437:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U holdfast_admin -d holdfast']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    tmpfs:
+      - /var/lib/postgresql/data

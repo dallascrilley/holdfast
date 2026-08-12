@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: test (postgres ${{ matrix.postgres }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '17']
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: holdfast_admin
+          POSTGRES_PASSWORD: holdfast_admin_local
+          POSTGRES_DB: holdfast
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U holdfast_admin -d holdfast"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      HOLDFAST_ADMIN_URL: postgres://holdfast_admin:holdfast_admin_local@127.0.0.1:5432/holdfast
+      HOLDFAST_APP_URL: postgres://holdfast_app:holdfast_app_local@127.0.0.1:5432/holdfast
+      HOLDFAST_APP_ROLE: holdfast_app
+      HOLDFAST_APP_PASSWORD: holdfast_app_local
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Verify the chain the suite just wrote
+        run: npm run verify
