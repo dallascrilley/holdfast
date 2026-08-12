@@ -91,6 +91,7 @@ export async function reset(config: HoldfastConfig = loadConfig()): Promise<void
       drop table if exists holdfast_ledger cascade;
       drop table if exists holdfast_migrations cascade;
       drop function if exists holdfast_block_mutation() cascade;
+      drop function if exists holdfast_serialize_append() cascade;
       drop function if exists holdfast_chain_entry() cascade;
       drop function if exists holdfast_enforce_gate() cascade;
       drop function if exists holdfast_genesis_hash() cascade;

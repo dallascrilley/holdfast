@@ -52,15 +52,16 @@ npm test
 > holdfast@0.1.0 test
 > vitest run
 
- RUN  v2.1.9
+ RUN  v2.1.8
 
-[holdfast tests] cold migration applied: 0001_ledger.sql, 0002_append_only_and_chain.sql, 0003_app_role.sql
- ✓ test/publish-gate.test.ts (12 tests) 195ms
- ✓ test/append-only-adversarial.test.ts (14 tests) 155ms
- ✓ test/chain.test.ts (8 tests) 82ms
+[holdfast tests] cold migration applied: 0001_ledger.sql, 0002_append_only_and_chain.sql, 0003_app_role.sql, 0004_gate_concurrency.sql
+ ✓ test/publish-gate.test.ts (12 tests) 151ms
+ ✓ test/append-only-adversarial.test.ts (14 tests) 113ms
+ ✓ test/chain.test.ts (8 tests) 72ms
+ ✓ test/gate-concurrency.test.ts (2 tests) 659ms
 
- Test Files  3 passed (3)
-      Tests  34 passed (34)
+ Test Files  4 passed (4)
+      Tests  36 passed (36)
 ```
 
 Then:
@@ -71,19 +72,19 @@ npm run verify       # walk the chain and report tampering
 ```
 
 ```
-proposed   e32ee28b-9e54-4cbd-97e7-89c07b683daa by ai:drafting-agent
-approved   c334a149-f219-488a-88da-29a4758e6042 by human:rowan.mercer
-published  457bb75e-18f7-4935-9e9a-1d0327032953 by human:rowan.mercer
+proposed   743e80bd-a72d-40bb-ae9f-8884cb99ecdd by ai:drafting-agent
+approved   bbc109e6-bb79-4fd4-9bb2-ee7c665c4d0a by human:rowan.mercer
+published  a8d21c7b-d223-4208-8db8-d5d0e534f570 by human:rowan.mercer
 
 chain for this decision:
-  60  proposal    2955170c10c6ee41…
-  61  approval    557a0d098c6d4ca0…
-  62  publication 2c33d2e120d24d65…
+  67  proposal    438ef7ba1d69332b…
+  68  approval    0e7950225e5a172c…
+  69  publication 1484854e2a440e0d…
 ```
 
 ```
-holdfast: checked 46 entries
-holdfast: chain intact, head 7b9e2211565092530e56691e122283ad58dfcaee51aae5d2e3dadd93bbb61c28
+holdfast: checked 54 entries
+holdfast: chain intact, head 1484854e2a440e0d860324eb3732f867a0d4f88b15b6fd338280708bd54798f6
 ```
 
 `npm run db:down` destroys the database.
@@ -100,7 +101,7 @@ Connected as `holdfast_app`, the role the application uses — it was never gran
 `UPDATE` or `DELETE`, so the statement dies on privilege check:
 
 ```
-$ psql "postgres://holdfast_app@127.0.0.1:55437/holdfast" \
+$ psql "postgres://holdfast_app:holdfast_app_local@127.0.0.1:55437/holdfast" \
     -c "update holdfast_ledger set payload='{}'::jsonb;" \
     -c "delete from holdfast_ledger;"
 ERROR:  permission denied for table holdfast_ledger
@@ -111,13 +112,13 @@ Connected as `holdfast_admin`, which **owns** the table and therefore bypasses i
 own grants entirely — this is the case a `REVOKE`-only design misses:
 
 ```
-$ psql "postgres://holdfast_admin@127.0.0.1:55437/holdfast" \
+$ psql "postgres://holdfast_admin:holdfast_admin_local@127.0.0.1:55437/holdfast" \
     -c "update holdfast_ledger set payload='{}'::jsonb;"
 ERROR:  holdfast_ledger is append-only: UPDATE is not permitted
 HINT:  Record a new entry instead of changing an existing one.
 CONTEXT:  PL/pgSQL function holdfast_block_mutation() line 3 at RAISE
 
-$ psql "postgres://holdfast_admin@127.0.0.1:55437/holdfast" \
+$ psql "postgres://holdfast_admin:holdfast_admin_local@127.0.0.1:55437/holdfast" \
     -c "delete from holdfast_ledger;"
 ERROR:  holdfast_ledger is append-only: DELETE is not permitted
 HINT:  Record a new entry instead of changing an existing one.
@@ -150,7 +151,7 @@ to hold), run against a cold Postgres 16:
 ```
  ✓ test/publish-gate.test.ts > the happy path > an AI proposes, a human approves, a human publishes
  ✓ test/publish-gate.test.ts > a non-human actor cannot cross the gate > the AI actor cannot approve its own proposal
- ✓ test/publish-gate.test.ts > a non-human actor cannot cross the gate > the AI actor cannot approve someone else's proposal either
+ ✓ test/publish-gate.test.ts > a non-human actor cannot cross the gate > the AI actor cannot approve someone else’s proposal either
  ✓ test/publish-gate.test.ts > a non-human actor cannot cross the gate > a system actor cannot approve
  ✓ test/publish-gate.test.ts > a non-human actor cannot cross the gate > the AI actor cannot publish an approval a human granted
  ✓ test/publish-gate.test.ts > a non-human actor cannot cross the gate > raw SQL does not help: the AI actor is refused at the database
@@ -178,13 +179,12 @@ to hold), run against a cold Postgres 16:
  ✓ test/chain.test.ts > an untampered chain > starts from the all-zero genesis hash
  ✓ test/chain.test.ts > an untampered chain > each entry carries the previous entry hash
  ✓ test/chain.test.ts > tampering behind the triggers > an edited payload is detected as a hash mismatch
- ✓ test/chain.test.ts > tampering behind the triggers > a changed actor is detected - attribution is inside the hash
+ ✓ test/chain.test.ts > tampering behind the triggers > a changed actor is detected — attribution is inside the hash
  ✓ test/chain.test.ts > tampering behind the triggers > a removed entry is detected as a broken link
  ✓ test/chain.test.ts > tampering behind the triggers > recomputing the hash to cover the edit still breaks the next link
  ✓ test/chain.test.ts > the verifier does not trust the database to grade itself > recomputes hashes in JavaScript, so a corrupted stored hash is caught
-
- Test Files  3 passed (3)
-      Tests  34 passed (34)
+ ✓ test/gate-concurrency.test.ts > the gate under concurrency > the same approval cannot be published twice by racing sessions 324ms
+ ✓ test/gate-concurrency.test.ts > the gate under concurrency > a proposal being rejected cannot be concurrently approved 314ms
 ```
 
 The tamper tests get behind the triggers the only way anyone can — the schema
@@ -222,6 +222,10 @@ entry id. There is no function signature, and no valid row shape, that expresses
    check constraint — approval, rejection and publication require `actor_kind =
    'human'`, an approval cannot come from the proposer, a publication must
    reference a human approval of the same decision, and neither can happen twice.
+   The "happens once" rules survive concurrency two independent ways: every
+   append takes the chain's advisory lock *before* the gate's checks run, and
+   two partial unique indexes enforce one decision per proposal and one
+   publication per approval even under snapshot isolation.
 
 ### The hash chain
 
@@ -286,10 +290,14 @@ Things Holdfast does not do. Read this section as carefully as the proof section
 migrations/0001_ledger.sql              table, enums, constraints
 migrations/0002_append_only_and_chain.sql   triggers: block mutation, chain, gate
 migrations/0003_app_role.sql            the restricted application role
+migrations/0004_gate_concurrency.sql    serialize-before-check + unique indexes
 src/ledger.ts     propose / approve / reject / publish / history
 src/verify.ts     independent JavaScript chain verification
 src/migrate.ts    migration runner and cold reset
 src/cli.ts        holdfast migrate | verify | demo
+src/config.ts     connection URLs and role names from the environment
+src/env.ts        dotenv-free .env loader
+src/index.ts      library entrypoint
 test/             the adversarial suite
 ```
 
