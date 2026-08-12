@@ -1,7 +1,11 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Client } from 'pg';
+// `pg` is CommonJS, so a named import is not statically resolvable from an ES
+// module. Default-import the namespace and destructure at runtime.
+import pg from 'pg';
+
+const { Client } = pg;
 
 import { loadConfig, type HoldfastConfig } from './config.js';
 

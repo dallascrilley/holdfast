@@ -6,7 +6,11 @@
  *   demo      append a synthetic proposal/approval/publication and print the chain
  */
 
-import { Pool } from 'pg';
+// `pg` is CommonJS; see the note in src/migrate.ts.
+import pg from 'pg';
+import type { Pool } from 'pg';
+
+const { Pool: PgPool } = pg;
 
 import { loadConfig } from './config.js';
 import { migrate } from './migrate.js';
@@ -14,7 +18,7 @@ import { approve, history, propose, publish } from './ledger.js';
 import { verifyChain } from './verify.js';
 
 async function withAppPool<T>(fn: (pool: Pool) => Promise<T>): Promise<T> {
-  const pool = new Pool({ connectionString: loadConfig().appUrl });
+  const pool = new PgPool({ connectionString: loadConfig().appUrl });
   try {
     return await fn(pool);
   } finally {

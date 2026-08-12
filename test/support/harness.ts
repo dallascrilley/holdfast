@@ -1,4 +1,8 @@
-import { Pool } from 'pg';
+// `pg` is CommonJS; see the note in src/migrate.ts.
+import pg from 'pg';
+import type { Pool } from 'pg';
+
+const { Pool: PgPool } = pg;
 
 import { loadConfig, type HoldfastConfig } from '../../src/config.js';
 
@@ -31,8 +35,8 @@ export function appRole(): string {
 /** Opens both connections. The schema itself is built once by test/global-setup.ts. */
 export async function setupDatabase(): Promise<void> {
   config = loadConfig();
-  admin = new Pool({ connectionString: config.adminUrl });
-  app = new Pool({ connectionString: config.appUrl });
+  admin = new PgPool({ connectionString: config.adminUrl });
+  app = new PgPool({ connectionString: config.appUrl });
 
   const [adminUser, appUser] = await Promise.all([
     admin.query<{ current_user: string }>('select current_user').then((r) => r.rows[0].current_user),
