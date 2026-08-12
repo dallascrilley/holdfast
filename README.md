@@ -1,5 +1,8 @@
 # Holdfast
 
+[![CI](https://github.com/dallascrilley/holdfast/actions/workflows/ci.yml/badge.svg)](https://github.com/dallascrilley/holdfast/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **An append-only decision ledger with a human approval gate: AI can propose, only a person can publish.**
 
 Holdfast is a small Postgres-backed module for systems where an automated agent
@@ -42,7 +45,7 @@ Verbatim, from a clean checkout. Requires Docker and Node 20+.
 
 ```
 git clone <this repo> && cd holdfast
-npm install
+npm ci
 cp .env.example .env
 npm run db:up        # postgres 16 on port 55437, tmpfs, throwaway
 npm test
@@ -52,16 +55,16 @@ npm test
 > holdfast@0.1.0 test
 > vitest run
 
- RUN  v2.1.8
+ RUN  v4.1.10
 
 [holdfast tests] cold migration applied: 0001_ledger.sql, 0002_append_only_and_chain.sql, 0003_app_role.sql, 0004_gate_concurrency.sql
- ✓ test/publish-gate.test.ts (12 tests) 151ms
- ✓ test/append-only-adversarial.test.ts (14 tests) 113ms
- ✓ test/chain.test.ts (8 tests) 72ms
- ✓ test/gate-concurrency.test.ts (2 tests) 659ms
+ ✓ test/publish-gate.test.ts (12 tests)
+ ✓ test/append-only-adversarial.test.ts (14 tests)
+ ✓ test/chain.test.ts (9 tests)
+ ✓ test/gate-concurrency.test.ts (3 tests)
 
  Test Files  4 passed (4)
-      Tests  36 passed (36)
+      Tests  38 passed (38)
 ```
 
 Then:
@@ -183,14 +186,23 @@ to hold), run against a cold Postgres 16:
  ✓ test/chain.test.ts > tampering behind the triggers > a removed entry is detected as a broken link
  ✓ test/chain.test.ts > tampering behind the triggers > recomputing the hash to cover the edit still breaks the next link
  ✓ test/chain.test.ts > the verifier does not trust the database to grade itself > recomputes hashes in JavaScript, so a corrupted stored hash is caught
- ✓ test/gate-concurrency.test.ts > the gate under concurrency > the same approval cannot be published twice by racing sessions 324ms
- ✓ test/gate-concurrency.test.ts > the gate under concurrency > a proposal being rejected cannot be concurrently approved 314ms
+ ✓ test/gate-concurrency.test.ts > the gate under concurrency > the same approval cannot be published twice by racing sessions
+ ✓ test/gate-concurrency.test.ts > the gate under concurrency > a proposal being rejected cannot be concurrently approved
+ ✓ test/gate-concurrency.test.ts > without migration 0004 the race lands > two racing publishes both commit when 0004 is absent
+ ✓ test/chain.test.ts > honest boundary: full rewrite is not detected without an external head anchor > a superuser who rewrites every entry from a point forward can leave verifyChain green
 ```
+
+The concurrency suite does not rely on a fixed sleep: the competing writer is
+observed waiting on the append advisory lock before the first transaction
+commits. The pre-0004 case is machine-checked — the suite drops the serialize
+trigger and partial unique indexes, proves both publishes commit, then restores
+migration `0004` and re-asserts fail-closed.
 
 The tamper tests get behind the triggers the only way anyone can — the schema
 owner disables them — then rewrite rows and assert that `verifyChain` notices.
 Each runs inside a transaction that is rolled back, so the attack is real but the
-damage is not.
+damage is not. The full-rewrite test is the negative control for the honest
+boundary below: an internal re-hash from the edit point forward verifies clean.
 
 ---
 
@@ -280,7 +292,14 @@ Things Holdfast does not do. Read this section as carefully as the proof section
   `sha256()`, built in since Postgres 11; nothing older has been tried.
 - **This is a reference module, not a library.** It is deliberately small enough
   to read end to end. There is no versioned package, no migration framework
-  integration, and no retention or archival story.
+  integration, and no retention or archival story. `"private": true` in
+  `package.json` is intentional — the `bin` and `main` fields exist so you can
+  run the extract locally, not as a registry claim.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and the CI gate. Security
+reports go through [SECURITY.md](SECURITY.md), not public issues.
 
 ---
 

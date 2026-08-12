@@ -16,7 +16,27 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "migrations"
+    "migrations",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dallascrilley/holdfast.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dallascrilley/holdfast/issues"
+  },
+  "homepage": "https://github.com/dallascrilley/holdfast#readme",
+  "keywords": [
+    "append-only",
+    "audit-log",
+    "human-in-the-loop",
+    "ai-safety",
+    "postgres",
+    "postgresql",
+    "typescript",
+    "ledger"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -32,10 +52,10 @@
     "pg": "8.13.1"
   },
   "devDependencies": {
-    "@types/node": "22.10.2",
+    "@types/node": "^22.13.10",
     "@types/pg": "8.11.10",
     "tsx": "4.19.2",
     "typescript": "5.7.2",
-    "vitest": "2.1.8"
+    "vitest": "4.1.10"
   }
 }

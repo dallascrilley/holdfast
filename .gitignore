@@ -1,7 +1,4 @@
 node_modules/
-# Direct dependency versions are pinned exactly in package.json; the lockfile is
-# regenerated per environment rather than committed.
-package-lock.json
 dist/
 .env
 *.log

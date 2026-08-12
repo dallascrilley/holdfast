@@ -172,3 +172,71 @@ describe('the verifier does not trust the database to grade itself', () => {
     expect(report.failures.some((f) => f.reason === 'hash_mismatch')).toBe(true);
   });
 });
+
+describe('honest boundary: full rewrite is not detected without an external head anchor', () => {
+  it('a superuser who rewrites every entry from a point forward can leave verifyChain green', async () => {
+    // Documents the README claim: the chain is tamper-evident against partial
+    // edits, not tamper-proof against a full forward rewrite. Without a head
+    // hash held outside this database, an internal re-hash from the edit point
+    // forward produces an intact chain. This test is the negative control.
+    const { proposalEntryId } = await seedDecision('chain-full-rewrite');
+    // A later entry so the rewrite has a successor to re-link.
+    await seedDecision('chain-full-rewrite-tail');
+
+    const report = await withTriggersDisabled(async (client) => {
+      // Punch a payload change into the proposal, then re-hash every row from
+      // that seq forward so prev_hash/entry_hash stay consistent end-to-end.
+      const { rows: fromHere } = await client.query<{ seq: string }>(
+        'select seq::text as seq from holdfast_ledger where entry_id = $1',
+        [proposalEntryId],
+      );
+      const startSeq = fromHere[0]?.seq;
+      expect(startSeq).toBeTruthy();
+
+      await client.query(
+        `update holdfast_ledger
+            set payload = jsonb_set(payload, '{body}', '"full rewrite of history"')
+          where entry_id = $1`,
+        [proposalEntryId],
+      );
+
+      const { rows } = await client.query<{
+        seq: string;
+        entry_id: string;
+        prev_hash: string;
+      }>(
+        `select seq::text as seq, entry_id, prev_hash
+           from holdfast_ledger
+          where seq >= $1::bigint
+          order by seq asc`,
+        [startSeq],
+      );
+
+      let prev = rows[0]!.prev_hash;
+      for (const row of rows) {
+        await client.query(
+          `update holdfast_ledger
+              set prev_hash = $1,
+                  entry_hash = encode(sha256(convert_to(holdfast_canonical_entry(
+                    $1::char(64), entry_id, subject_id, decision_key, entry_type,
+                    actor_kind, actor_id, approves_entry_id, payload, recorded_at
+                  ), 'UTF8')), 'hex')
+            where entry_id = $2
+            returning entry_hash`,
+          [prev, row.entry_id],
+        );
+        const { rows: hashed } = await client.query<{ entry_hash: string }>(
+          'select entry_hash from holdfast_ledger where entry_id = $1',
+          [row.entry_id],
+        );
+        prev = hashed[0]!.entry_hash;
+      }
+
+      return verifyChain(client);
+    });
+
+    expect(report.intact).toBe(true);
+    expect(report.failures).toEqual([]);
+  });
+});
+
